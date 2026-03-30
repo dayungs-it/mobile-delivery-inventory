@@ -1,0 +1,16 @@
+{
+  "name": "restaurant-delivery-system",
+  "version": "1.0.0",
+  "description": "餐飲配送庫存管理系統",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}

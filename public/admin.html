@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>餐飲配送庫存管理報表</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green:      #134532; --green-mid: #1c5e44; --green-light: #e8f0eb; --green-pale: #f2f6f3;
+  --gold:       #D5C78C; --gold-dark: #b8a96a; --gold-light: #faf7ed;
+  --bg:         #f0f2f0; --surface: #ffffff; --border: #dde3de;
+  --text:       #111c17; --text-2: #4a5c52; --text-3: #8a9e92;
+  --success:    #2e7d52; --danger: #c0392b; --warning: #b8860b;
+}
+body { font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* Header */
+.hd { background:var(--green); height:56px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.hd-title { color:#fff; font-size:15px; font-weight:700; }
+.hd-badge { background:var(--gold); color:var(--green); font-size:11px; font-weight:800; padding:3px 10px; border-radius:20px; }
+
+/* 主容器 */
+.wrap { max-width:1280px; margin:0 auto; padding:14px; }
+@media(min-width:768px){ .wrap{ padding:24px 32px 48px; } }
+
+/* 篩選列 */
+.filter-bar { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.fl { font-size:12px; font-weight:600; color:var(--text-2); white-space:nowrap; }
+.fi { background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:7px 10px; font-size:13px; color:var(--text); font-family:inherit; outline:none; flex:1; min-width:100px; }
+.fi:focus { border-color:var(--green); }
+.fbtn { background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap; }
+.fbtn:hover { background:var(--green-mid); }
+
+/* 彙總 */
+.sum-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+@media(min-width:768px){ .sum-grid{ grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:20px; } }
+.sum-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+.sum-lbl { font-size:10px; color:var(--text-3); margin-bottom:4px; }
+.sum-num { font-size:20px; font-weight:800; color:var(--green); }
+@media(min-width:768px){ .sum-num{ font-size:24px; } }
+.sum-num.warn { color:var(--danger); }
+.sum-num.ok { color:var(--success); }
+.sum-num.gold { color:var(--gold-dark); }
+
+/* 業務區塊 */
+.driver-block { background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:10px; overflow:hidden; }
+.driver-block.anomaly { border-left:4px solid var(--danger); }
+.driver-hd { display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; background:var(--green-pale); border-bottom:1px solid var(--border); user-select:none; }
+.driver-hd:hover { background:var(--green-light); }
+.dv-avatar { width:34px; height:34px; border-radius:50%; background:var(--green); color:var(--gold); font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.dv-name { font-size:14px; font-weight:700; color:var(--text); flex:1; }
+.dv-stats { display:flex; gap:10px; flex-wrap:wrap; }
+.dv-stat { font-size:11px; color:var(--text-3); }
+.dv-stat b { font-weight:700; color:var(--text); }
+.dv-stat.warn b { color:var(--danger); }
+.dv-stat.ok b { color:var(--success); }
+.dv-stat.warn { font-size:12px; font-weight:700; }
+.dv-stat.ok { font-size:12px; font-weight:700; }
+.st-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; flex-shrink:0; }
+.st-badge.out  { background:#fdf3e0; color:var(--warning); }
+.st-badge.done { background:#e6f4ee; color:var(--success); }
+.st-badge.none { background:var(--bg); color:var(--text-3); }
+.dv-toggle { font-size:11px; color:var(--text-3); flex-shrink:0; }
+.dv-body { display:none; }
+.dv-body.open { display:block; }
+
+/* 出門紀錄 header */
+.dp-sec { border-bottom:1px solid var(--border); }
+.dp-sec:last-child { border-bottom:none; }
+.dp-hd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:9px 14px; background:#fafcfa; border-bottom:1px solid var(--border); }
+.dp-tag { font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; flex-shrink:0; }
+.dp-tag.out  { background:#fdf3e0; color:var(--warning); }
+.dp-tag.done { background:#e6f4ee; color:var(--success); }
+.dp-time { font-size:12px; font-weight:600; color:var(--text-2); white-space:nowrap; }
+.dp-return { font-size:12px; font-weight:600; color:var(--success); white-space:nowrap; }
+.dp-note { font-size:11px; color:var(--text-3); margin-left:auto; }
+
+/* 桌機表格 */
+.tbl-desktop { display:none; width:100%; border-collapse:collapse; }
+@media(min-width:768px){ .tbl-desktop{ display:table; } }
+.tbl-desktop thead th { background:var(--green); color:#fff; padding:9px 12px; text-align:left; font-size:12px; font-weight:600; white-space:nowrap; }
+.tbl-desktop thead th.r { text-align:right; }
+.tbl-desktop tbody td { padding:10px 12px; font-size:13px; color:var(--text-2); border-bottom:1px solid var(--border); }
+.tbl-desktop tbody tr:last-child td { border-bottom:none; }
+.tbl-desktop tbody tr:hover td { background:var(--green-light); }
+.tbl-desktop tbody tr.row-anom td { background:#fff8f8; }
+.tbl-desktop tbody tr.row-rtn td { background:var(--gold-light); }
+td.r { text-align:right; font-weight:600; color:var(--text); }
+td.pname { font-weight:600; color:var(--text); }
+td.exp { font-family:monospace; font-size:12px; color:var(--text-3); }
+td.rtype { font-size:11px; font-weight:700; }
+.c-out { color:var(--warning); }
+.c-rtn { color:var(--gold-dark); }
+td.diff-p { text-align:right; font-weight:700; color:var(--success) !important; }
+td.diff-n { text-align:right; font-weight:700; color:var(--danger) !important; }
+td.dz { text-align:right; color:var(--text-3); }
+
+/* 手機卡片 */
+.mob-cards { display:flex; flex-direction:column; }
+@media(min-width:768px){ .mob-cards{ display:none; } }
+.mob-card { padding:10px 14px; border-bottom:1px solid var(--border); }
+.mob-card:last-child { border-bottom:none; }
+.mob-card.anom { background:#fff8f8; }
+.mob-card.rtn  { background:var(--gold-light); }
+.mc-top { display:flex; align-items:flex-start; justify-content:space-between; gap:6px; margin-bottom:5px; }
+.mc-name { font-weight:700; color:var(--text); font-size:13px; flex:1; }
+.mc-type { font-size:11px; font-weight:700; flex-shrink:0; }
+.mc-exp  { font-size:11px; color:var(--text-3); font-family:monospace; margin-bottom:6px; }
+.mc-nums { display:flex; gap:10px; flex-wrap:wrap; }
+.mc-n { font-size:12px; color:var(--text-3); }
+.mc-n b { font-weight:700; color:var(--text); }
+.mc-n.diff-p b { color:var(--success); }
+.mc-n.diff-n b { color:var(--danger); }
+.mc-n.warn { color:var(--warning); font-weight:600; }
+
+.empty { text-align:center; padding:28px; color:var(--text-3); font-size:13px; }
+
+/* 客戶明細 */
+.client-rows.collapsed { display:none; }
+.client-detail { padding:6px 14px 8px 32px; background:#f8faf9; border-top:1px solid var(--border); }
+.client-detail.collapsed { display:none; }
+.client-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.client-row:last-child { border-bottom:none; }
+.client-name { color:var(--text-2); }
+.client-qty { font-weight:700; color:var(--text); min-width:30px; text-align:right; }
+.expand-btn { display:inline-block; margin-left:6px; font-size:10px; color:var(--green); cursor:pointer; background:var(--green-light); padding:1px 6px; border-radius:10px; font-weight:700; vertical-align:middle; white-space:nowrap; }
+.expand-btn:hover { background:var(--green-light); opacity:.8; }
+.view-toggle { background:var(--surface); border:none; padding:7px 14px; font-size:12px; font-weight:600; color:var(--text-3); cursor:pointer; font-family:inherit; white-space:nowrap; }
+.view-toggle.active { background:var(--green); color:#fff; }
+.view-toggle:hover:not(.active) { background:var(--green-light); color:var(--green); }
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <div class="hd-title">📦 餐飲配送庫存管理報表</div>
+  <div class="hd-badge">倉管 / 業助</div>
+</div>
+
+<div class="wrap">
+  <div class="filter-bar">
+    <div class="fl">日期</div>
+    <input type="date" class="fi" id="fDate" style="max-width:160px">
+    <div class="fl">業務</div>
+    <select class="fi" id="fDriver" style="max-width:140px">
+      <option value="">全部</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);white-space:nowrap;cursor:pointer">
+      <input type="checkbox" id="fAnom" style="width:15px;height:15px;accent-color:var(--green)"> 僅看異常
+    </label>
+    <button class="fbtn" onclick="loadData()">套用</button>
+    <div style="display:flex;gap:0;margin-left:auto;border:1.5px solid var(--border);border-radius:8px;overflow:hidden">
+      <button id="btnDetail" class="view-toggle active" onclick="setView('detail')">📋 效期明細</button>
+      <button id="btnSummary" class="view-toggle" onclick="setView('summary')">📦 品項彙總</button>
+    </div>
+  </div>
+
+  <div class="sum-grid" id="sumGrid"></div>
+  <div id="driverList"></div>
+</div>
+
+<script>
+let _uid = 0;
+function uid() { return ++_uid; }
+let currentView = 'detail'; // 'detail' | 'summary'
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('btnDetail').classList.toggle('active', v==='detail');
+  document.getElementById('btnSummary').classList.toggle('active', v==='summary');
+  applyFilter();
+}
+
+// ── 品項彙總：依業務分組，同品項跨批次加總 ──
+function renderSummary(data) {
+  const el = document.getElementById('driverList');
+  if (!data.length) { el.innerHTML = '<div class="empty">無資料</div>'; return; }
+
+  el.innerHTML = data.map((d, di) => {
+    // 把同品項的批次加總
+    const itemMap = {}; // code -> { product, taken, oq, should, returned, diff }
+    d.dispatches.forEach(dp => {
+      dp.items.forEach(item => {
+        if (!itemMap[item.code]) {
+          itemMap[item.code] = { product: item.product, taken:0, oq:0, should:0, returned:0, diff:0, hasNull:false };
+        }
+        item.batches.forEach(b => {
+          const {oq, should, diff} = calcRow(d.driver, item.code, b.expiry, b.taken, b.returned??null);
+          const hasRet = b.returned !== null && b.returned !== undefined;
+          itemMap[item.code].taken += b.taken;
+          if (hasRet) {
+            itemMap[item.code].oq       += oq ?? 0;
+            itemMap[item.code].should   += should ?? 0;
+            itemMap[item.code].returned += b.returned;
+            itemMap[item.code].diff     += diff ?? 0;
+          } else {
+            itemMap[item.code].hasNull = true; // 有批次尚未繳回
+          }
+        });
+      });
+    });
+
+    // 退換貨
+    const rtnMap = {};
+    d.dispatches.forEach(dp => {
+      dp.returnGoods.forEach(rg => {
+        if (!rtnMap[rg.product]) rtnMap[rg.product] = 0;
+        rg.batches.forEach(b => { rtnMap[rg.product] += b.qty; });
+      });
+    });
+
+    const hasAnom = Object.values(itemMap).some(it => it.diff !== 0);
+    const statusLabel = d.status==='out'?'出門中':d.status==='done'?'已回庫':'未出門';
+    const totalTaken = Object.values(itemMap).reduce((s,it)=>s+it.taken,0);
+    const totalRet   = Object.values(itemMap).reduce((s,it)=>s+it.returned,0);
+    const totalRtn   = Object.values(rtnMap).reduce((s,v)=>s+v,0);
+    const totalDiff  = Object.values(itemMap).reduce((s,it)=>s+it.diff,0);
+
+    const tableRows = Object.values(itemMap).map(it => {
+      const isAnom = it.diff !== 0;
+      let diffCell = `<td class="dz">—</td>`;
+      if (!it.hasNull || it.returned > 0) {
+        diffCell = it.diff > 0
+          ? `<td class="diff-p">+${it.diff}</td>`
+          : it.diff < 0
+            ? `<td class="diff-n">${it.diff}</td>`
+            : `<td class="dz">0</td>`;
+      }
+      return `<tr class="${isAnom?'row-anom':''}">
+        <td class="pname">${it.product}</td>
+        <td class="r">${it.taken}</td>
+        <td class="r">${it.oq||'—'}</td>
+        <td class="r">${it.should||'—'}</td>
+        <td class="r">${it.hasNull && it.returned===0 ? '<span style="color:var(--warning)">未繳回</span>' : it.returned}</td>
+        ${diffCell}
+        <td class="dz">—</td>
+      </tr>`;
+    }).join('');
+
+    const rtnRows = Object.entries(rtnMap).map(([name, qty]) =>
+      `<tr class="row-rtn">
+        <td class="pname" style="color:var(--gold-dark)">↩ ${name}</td>
+        <td class="dz">—</td><td class="dz">—</td><td class="dz">—</td>
+        <td class="dz">—</td><td class="dz">—</td>
+        <td class="r" style="color:var(--gold-dark);font-weight:700">${qty}</td>
+      </tr>`
+    ).join('');
+
+    const body = Object.keys(itemMap).length ? `
+      <table class="tbl-desktop">
+        <thead><tr>
+          <th>品項名稱</th>
+          <th class="r">帶出</th><th class="r">訂單量</th>
+          <th class="r">應繳回</th><th class="r">實際繳回</th>
+          <th class="r">差異</th><th class="r">收退換貨</th>
+        </tr></thead>
+        <tbody>${tableRows}${rtnRows}</tbody>
+      </table>
+      <div class="mob-cards">
+        ${Object.values(itemMap).map(it => {
+          const isAnom = it.diff !== 0;
+          let diffHtml = '';
+          if (!it.hasNull || it.returned > 0) {
+            diffHtml = `<div class="mc-n ${it.diff>0?'diff-p':it.diff<0?'diff-n':''}">差異 <b>${it.diff>0?'+':''}${it.diff}</b></div>`;
+          }
+          return `<div class="mob-card ${isAnom?'anom':''}">
+            <div class="mc-top"><div class="mc-name">${it.product}</div></div>
+            <div class="mc-nums">
+              <div class="mc-n">帶出 <b>${it.taken}</b></div>
+              ${it.oq?`<div class="mc-n">訂單 <b>${it.oq}</b></div>`:''}
+              ${it.should?`<div class="mc-n">應繳 <b>${it.should}</b></div>`:''}
+              <div class="mc-n ${it.hasNull&&it.returned===0?'warn':''}">${it.hasNull&&it.returned===0?'未繳回':`繳回 <b>${it.returned}</b>`}</div>
+              ${diffHtml}
+            </div>
+          </div>`;
+        }).join('')}
+        ${Object.entries(rtnMap).map(([name,qty])=>`
+          <div class="mob-card rtn">
+            <div class="mc-top"><div class="mc-name">↩ ${name}</div><div class="mc-type c-rtn">收退換貨</div></div>
+            <div class="mc-nums"><div class="mc-n">收回 <b>${qty}</b></div></div>
+          </div>`).join('')}
+      </div>` : '<div class="empty" style="padding:16px">今日未出門</div>';
+
+    return `<div class="driver-block ${hasAnom?'anomaly':''}">
+      <div class="driver-hd" onclick="toggle(${di})">
+        <div class="dv-avatar">${d.driver[1]}</div>
+        <div class="dv-name">${d.driver}</div>
+        <div class="dv-stats">
+          <div class="dv-stat">帶出 <b>${totalTaken}</b></div>
+          <div class="dv-stat">繳回 <b>${totalRet}</b></div>
+          ${totalRtn>0?`<div class="dv-stat">退換 <b>${totalRtn}</b></div>`:''}
+          ${hasAnom?`<div class="dv-stat warn" style="color:var(--danger)">⚠ 差異 <b style="background:#fdecea;color:var(--danger);padding:1px 7px;border-radius:12px">${totalDiff>0?'+':''}${totalDiff}</b></div>`:''}
+        </div>
+        <div class="st-badge ${d.status}">${statusLabel}</div>
+        <div class="dv-toggle" id="tg-${di}">▼</div>
+      </div>
+      <div class="dv-body" id="bd-${di}">${body}</div>
+    </div>`;
+  }).join('');
+}
+
+let DATA = [];
+
+let ORDERS = {};
+
+// ── 從 API 載入資料 ──
+async function loadData() {
+  const date   = document.getElementById('fDate').value;
+  const driver = document.getElementById('fDriver').value;
+
+  const p1 = new URLSearchParams({ date });
+  if (driver) p1.set('driver', driver);
+  const p2 = new URLSearchParams({ date });
+  if (driver) p2.set('driver', driver);
+
+  try {
+    const [dispRes, orderRes] = await Promise.all([
+      fetch(`/api/dispatches?${p1}`),
+      fetch(`/api/orders?${p2}`),
+    ]);
+    DATA = dispRes.ok ? await dispRes.json() : [];
+    const orderList = orderRes.ok ? await orderRes.json() : [];
+
+    // 將 ERP 訂單陣列轉成 ORDERS[業務][code|expiry] 格式
+    ORDERS = {};
+    orderList.forEach(row => {
+      if (row.item_type === '換貨-收回') return;
+      const drv = row.driver_name;
+      const key = `${row.product_code}|${row.expiry_date}`;
+      if (!ORDERS[drv]) ORDERS[drv] = {};
+      if (!ORDERS[drv][key]) ORDERS[drv][key] = { total: 0, clients: [] };
+      ORDERS[drv][key].total += (row.qty || 0);
+      ORDERS[drv][key].clients.push({ name: row.client_name, qty: row.qty });
+    });
+  } catch (e) {
+    console.warn('[loadData]', e);
+    DATA = []; ORDERS = {};
+  }
+
+  // 更新業務下拉（保留目前選擇）
+  const fDriver = document.getElementById('fDriver');
+  const cur = fDriver.value;
+  const drivers = [...new Set(DATA.map(d => d.driver))];
+  fDriver.innerHTML = '<option value="">全部</option>' +
+    drivers.map(n => `<option value="${n}"${n===cur?' selected':''}>${n}</option>`).join('');
+
+  applyFilter();
+}
+
+// 初始化
+document.getElementById('fDate').value = new Date().toISOString().slice(0,10);
+loadData();
+setInterval(loadData, 30000); // 每 30 秒自動刷新
+
+// 依「品項代碼 + 效期」查詢訂單，精確對應每批次
+function calcRow(driver, code, expiry, taken, returned) {
+  const key = `${code}|${expiry}`;
+  const entry = ORDERS[driver]?.[key] ?? null;
+  if (returned===null || returned===undefined) {
+    // 出門中：不顯示訂單量、應繳回、差異
+    return { oq: null, should: null, diff: null, clients: [] };
+  }
+  const oq    = entry ? entry.total : null;
+  const should= oq !== null ? taken - oq : null;
+  const diff  = should !== null ? returned - should : null;
+  return { oq, should, diff, clients: entry?.clients ?? [] };
+}
+
+function hasAnom(d) {
+  return d.dispatches.some(dp=>dp.items.some(item=>item.batches.some(b=>{
+    const {diff}=calcRow(d.driver,item.code,b.expiry,b.taken,b.returned??null);
+    return diff!==null&&diff!==0;
+  })));
+}
+
+function applyFilter() {
+  const df=document.getElementById('fDriver').value;
+  const af=document.getElementById('fAnom').checked;
+  let data=df?DATA.filter(d=>d.driver===df):DATA;
+  if(af) data=data.filter(d=>hasAnom(d));
+
+  let tT=0,tO=0,tS=0,tR=0,tD=0,tRtn=0;
+  data.forEach(d=>{
+    d.dispatches.forEach(dp=>{
+      dp.items.forEach(item=>item.batches.forEach(b=>{
+        tT+=b.taken;
+        const {oq,should,diff}=calcRow(d.driver,item.code,b.expiry,b.taken,b.returned??null);
+        if(b.returned!==null&&b.returned!==undefined){
+          tO+=oq??0; tS+=should??0; tR+=b.returned; tD+=diff??0;
+        }
+      }));
+      dp.returnGoods.forEach(rg=>rg.batches.forEach(b=>{ tRtn+=b.qty; }));
+    });
+  });
+
+  document.getElementById('sumGrid').innerHTML=`
+    <div class="sum-card"><div class="sum-lbl">帶出總量</div><div class="sum-num">${tT}</div></div>
+    <div class="sum-card"><div class="sum-lbl">訂單量</div><div class="sum-num">${tO}</div></div>
+    <div class="sum-card"><div class="sum-lbl">應繳回</div><div class="sum-num">${tS}</div></div>
+    <div class="sum-card"><div class="sum-lbl">實際繳回</div><div class="sum-num">${tR}</div></div>
+    <div class="sum-card"><div class="sum-lbl">差異</div><div class="sum-num ${tD>0?'ok':tD<0?'warn':''}">${tD>0?'+':''}${tD}</div></div>
+    <div class="sum-card"><div class="sum-lbl">收退換貨</div><div class="sum-num gold">${tRtn}</div></div>`;
+
+  const el=document.getElementById('driverList');
+  if(!data.length){el.innerHTML='<div class="empty">無資料</div>';return;}
+
+  if (currentView === 'summary') {
+    renderSummary(data);
+    return;
+  }
+
+  el.innerHTML=data.map((d,di)=>{
+    const anom=hasAnom(d);
+    let dT=0,dR=0,dRtn=0,dD=0;
+    d.dispatches.forEach(dp=>{
+      dp.items.forEach(item=>item.batches.forEach(b=>{
+        dT+=b.taken;
+        if(b.returned!==null&&b.returned!==undefined){
+          dR+=b.returned;
+          const {diff}=calcRow(d.driver,item.code,b.expiry,b.taken,b.returned);
+          dD+=diff??0;
+        }
+      }));
+      dp.returnGoods.forEach(rg=>rg.batches.forEach(b=>{dRtn+=b.qty;}));
+    });
+    const sl=d.status==='out'?'出門中':d.status==='done'?'已回庫':'未出門';
+    const body=d.dispatches.length
+      ?d.dispatches.map((dp,dpi)=>renderDP(d.driver,dp)).join('')
+      :'<div class="empty" style="padding:16px">今日未出門</div>';
+
+    return `<div class="driver-block ${anom?'anomaly':''}">
+      <div class="driver-hd" onclick="toggle(${di})">
+        <div class="dv-avatar">${d.driver[1]}</div>
+        <div class="dv-name">${d.driver}</div>
+        <div class="dv-stats">
+          <div class="dv-stat">帶出 <b>${dT}</b></div>
+          <div class="dv-stat">繳回 <b>${dR}</b></div>
+          ${dRtn>0?`<div class="dv-stat">退換 <b>${dRtn}</b></div>`:''}
+          ${anom?`<div class="dv-stat warn" style="color:var(--danger)">⚠ 差異 <b style="background:${dD>0?'#e6f4ee':'#fdecea'};color:${dD>0?'var(--success)':'var(--danger)'};padding:1px 7px;border-radius:12px">${dD>0?'+':''}${dD}</b></div>`:''}
+        </div>
+        <div class="st-badge ${d.status}">${sl}</div>
+        <div class="dv-toggle" id="tg-${di}">▼</div>
+      </div>
+      <div class="dv-body" id="bd-${di}">${body}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDP(driver, dp) {
+  const sl=dp.status==='out'?'出門中':'已回庫';
+
+  const rows=[];
+  dp.items.forEach(item=>{
+    item.batches.forEach((b,bi)=>{
+      const {oq,should,diff,clients}=calcRow(driver,item.code,b.expiry,b.taken,b.returned??null);
+      const hasRet=b.returned!==null&&b.returned!==undefined;
+      const isAnom=diff!==null&&diff!==0;
+      rows.push({type:'out',name:bi===0?item.product:'',code:item.code,
+        expiry:b.expiry,taken:b.taken,oq,should,returned:b.returned,
+        diff,hasRet,isAnom,clients,isFirst:bi===0});
+    });
+  });
+  dp.returnGoods.forEach(rg=>{
+    rg.batches.forEach((b,bi)=>{
+      rows.push({type:'rtn',name:bi===0?rg.product:'',expiry:b.expiry,qty:b.qty});
+    });
+  });
+
+  // 桌機表格
+  const tRows=rows.map(r=>{
+    if(r.type==='rtn') return `<tr class="row-rtn">
+      <td class="rtype c-rtn">${r.name?'收退換貨':''}</td>
+      <td class="pname">${r.name}</td><td class="exp">${r.expiry}</td>
+      <td class="dz">—</td><td class="dz">—</td><td class="dz">—</td>
+      <td class="dz">—</td><td class="dz">—</td>
+      <td class="r" style="color:var(--gold-dark);font-weight:700">${r.qty}</td></tr>`;
+    let dc=`<td class="dz">—</td>`;
+    if(r.diff!==null) dc=r.diff>0?`<td class="diff-p">+${r.diff}</td>`:r.diff<0?`<td class="diff-n">${r.diff}</td>`:`<td class="dz">0</td>`;
+
+    const cid=`cl-${uid()}`;
+    const hasClients=r.clients&&r.clients.length&&r.isAnom;
+    const clientRow=hasClients?`<tr class="client-rows collapsed" id="${cid}">
+        <td colspan="9" style="padding:0">
+          <div class="client-detail">
+            ${r.clients.map(c=>`<div class="client-row"><span class="client-name">↳ ${c.name}</span><span class="client-qty">${c.qty}</span></div>`).join('')}
+          </div>
+        </td></tr>`:'';
+    const toggleBtn=hasClients?`<span class="expand-btn" onclick="toggleCl(event,'${cid}',this)">▼</span>`:'';
+
+    return `<tr class="${r.isAnom?'row-anom':''}">
+      <td class="rtype c-out">${r.name?'帶出':''}</td>
+      <td class="pname">${r.name}${toggleBtn}</td>
+      <td class="exp">${r.expiry}</td>
+      <td class="r">${r.taken}</td>
+      <td class="r">${r.oq??'—'}</td>
+      <td class="r">${r.should??'—'}</td>
+      <td class="r">${r.hasRet?r.returned:'<span style="color:var(--warning)">未繳回</span>'}</td>
+      ${dc}
+      <td class="dz">—</td></tr>${clientRow}`;
+  }).join('');
+
+  // 手機卡片
+  const mCards=rows.map(r=>{
+    if(r.type==='rtn') return `<div class="mob-card rtn">
+      <div class="mc-top"><div class="mc-name">${r.name||'（同上）'}</div><div class="mc-type c-rtn">收退換貨</div></div>
+      <div class="mc-exp">效期 ${r.expiry}</div>
+      <div class="mc-nums"><div class="mc-n">收回 <b>${r.qty}</b></div></div></div>`;
+    let diffHtml='';
+    if(r.diff!==null) diffHtml=`<div class="mc-n ${r.diff>0?'diff-p':r.diff<0?'diff-n':''}">差異 <b>${r.diff>0?'+':''}${r.diff}</b></div>`;
+    const mcid=`mc-${uid()}`;
+    const hasClients=r.clients&&r.clients.length&&r.isAnom;
+    const clientMob=hasClients?`<div class="client-detail collapsed" id="${mcid}">
+        ${r.clients.map(c=>`<div class="client-row"><span class="client-name">↳ ${c.name}</span><span class="client-qty">${c.qty}</span></div>`).join('')}
+      </div>`:'';
+    const toggleMob=hasClients?`<span class="expand-btn" onclick="toggleCl(event,'${mcid}',this)">▼</span>`:'';
+
+    return `<div class="mob-card ${r.isAnom?'anom':''}">
+      <div class="mc-top">
+        <div class="mc-name">${r.name||'（同上）'} ${toggleMob}</div>
+        <div class="mc-type c-out">帶出</div>
+      </div>
+      <div class="mc-exp">效期 ${r.expiry}</div>
+      <div class="mc-nums">
+        <div class="mc-n">帶出 <b>${r.taken}</b></div>
+        ${r.oq!==null?`<div class="mc-n">訂單 <b>${r.oq}</b></div>`:''}
+        ${r.should!==null?`<div class="mc-n">應繳 <b>${r.should}</b></div>`:''}
+        <div class="mc-n ${!r.hasRet?'warn':''}">${r.hasRet?`繳回 <b>${r.returned}</b>`:'未繳回'}</div>
+        ${diffHtml}
+      </div>
+      ${clientMob}
+    </div>`;
+  }).join('');
+
+  return `<div class="dp-sec">
+    <div class="dp-hd">
+      <div class="dp-tag ${dp.status}">${sl}</div>
+      <div class="dp-time">🚗 ${dp.time} 出門</div>
+      ${dp.returnTime?`<div class="dp-return">⬇ ${dp.returnTime} 回庫</div>`:''}
+      ${dp.note?`<div class="dp-note">📝 ${dp.note}</div>`:''}
+    </div>
+    <table class="tbl-desktop">
+      <thead><tr>
+        <th style="width:70px">類型</th><th>品項名稱</th><th>效期</th>
+        <th class="r">帶出</th><th class="r">訂單量</th><th class="r">應繳回</th>
+        <th class="r">實際繳回</th><th class="r">差異</th><th class="r">收退換貨</th>
+      </tr></thead>
+      <tbody>${tRows}</tbody>
+    </table>
+    <div class="mob-cards">${mCards}</div>
+  </div>`;
+}
+
+function toggleCl(e, id, btn) {
+  e.stopPropagation();
+  const el=document.getElementById(id);
+  if(!el) return;
+  const collapsed=el.classList.toggle('collapsed');
+  btn.textContent=collapsed?'▼':'▲';
+}
+
+function toggle(i){
+  const bd=document.getElementById('bd-'+i);
+  const tg=document.getElementById('tg-'+i);
+  const open=bd.classList.toggle('open');
+  tg.textContent=open?'▲':'▼';
+}
+</script>
+</body>
+</html>
